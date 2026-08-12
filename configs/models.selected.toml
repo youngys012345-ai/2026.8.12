@@ -11,28 +11,36 @@ reason = "PyTorch 固定类别检测、多卡训练、TensorRT/TorchScript 与 B
 
 [[models]]
 id = "yolo-world"
-role = "open_vocabulary_probe"
+role = "zero_shot_open_vocabulary_probe"
 enabled = true
 repository = "https://github.com/AILab-CVC/YOLO-World"
-license = "verify repository and checkpoint terms before production use"
-reason = "适合不确定实体名称时做候选对象发现、辅助标注和低频旁路复核"
+license = "GPL-3.0 repository; production use in closed systems requires compliance review or commercial licensing"
+reason = "适合不确定实体名称时做候选对象发现、零样本开放词表测试、辅助标注和低频旁路复核"
 
 [[models]]
 id = "pet-dino"
-role = "visual_prompt_probe"
+role = "zero_shot_visual_prompt_probe"
 enabled = true
-repository = "https://github.com/IDEA-Research/PET-DINO"
-license = "verify repository and checkpoint terms before production use"
+repository = "https://github.com/fuweifuvtoo/PET_DINO"
+license = "Apache-2.0"
 reason = "适合用少量视觉样例发现同类工装、夹具、线束、原料和半成品"
 
 [[models]]
 id = "grounding-dino"
-role = "text_prompt_annotation_helper"
+role = "zero_shot_text_prompt_annotation_helper"
 enabled = true
 repository = "https://github.com/IDEA-Research/GroundingDINO"
 weights = "IDEA-Research/grounding-dino-tiny"
 license = "Apache-2.0"
 reason = "用于文本提示类别探索和半自动标注，不作为生产逐帧唯一主链"
+
+[[models]]
+id = "owlv2"
+role = "zero_shot_text_and_image_guided_baseline"
+enabled = true
+repository = "https://huggingface.co/google/owlv2-base-patch16-ensemble"
+license = "verify model card/license metadata before production use"
+reason = "标准零样本文本检测基线，也可测试 image-guided detection，适合和 Grounding DINO / YOLO-World / PET-DINO 对照"
 
 [[models]]
 id = "bytetrack"

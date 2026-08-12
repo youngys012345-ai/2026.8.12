@@ -43,25 +43,31 @@ $env:INTRANET_MCP_TOKEN = "your-token"
 只校验配置，不连接远程：
 
 ```bash
-llm-pipeline validate -c configs/model_params.example.json
+ivd-pipeline validate -c configs/model_params.example.json
 ```
 
 只生成执行计划，不连接远程：
 
 ```bash
-llm-pipeline plan -c configs/model_params.example.json
+ivd-pipeline plan -c configs/model_params.example.json
 ```
 
 查看远程 MCP 已暴露的工具：
 
 ```bash
-llm-pipeline tools -c configs/model_params.example.json
+ivd-pipeline tools -c configs/model_params.example.json
 ```
 
 执行下载、训练、部署、组合和数据处理：
 
 ```bash
-llm-pipeline run -c configs/model_params.example.json
+ivd-pipeline run -c configs/model_params.example.json
+```
+
+兼容旧入口：
+
+```bash
+llm-pipeline plan -c configs/model_params.example.json
 ```
 
 ## 4. 图片推理
@@ -92,7 +98,25 @@ infer-video --config configs/model_params.example.json --input data/raw/example.
 
 `--frame-stride 2` 表示每 2 帧推理 1 帧；如果要逐帧推理，设为 `1`。
 
-## 6. 多卡视频批处理
+## 6. 零样本目标检测测试
+
+当前零样本本地基线配置是 `configs/zero_shot.example.json`，默认使用 OWLv2 文本零样本检测。适合先评估“没有现场训练时，模型能否用文本 prompt 找到工人、手、工具、线束、物料盒、夹具等实体”。
+
+图片：
+
+```bash
+infer-image --config configs/zero_shot.example.json --input data/raw/example.jpg --output-dir artifacts/zero-shot
+```
+
+视频抽帧：
+
+```bash
+infer-video --config configs/zero_shot.example.json --input data/raw/example.mp4 --output-dir artifacts/zero-shot --frame-stride 5
+```
+
+修改 `configs/zero_shot.example.json` 中的 `prompts` 可以测试不同候选实体名称。中文类名建议先翻译成英文或中英都测一轮，因为这类模型的公开预训练语料通常英文更稳。
+
+## 7. 多卡视频批处理
 
 多卡建议按摄像头或视频分配 GPU。对单个长视频做采样帧分片时可以用：
 
@@ -106,7 +130,7 @@ torchrun --standalone --nproc-per-node=4 scripts/infer_video.py \
 
 多进程模式会分别输出 `rank-00.jsonl`、`rank-01.jsonl` 等文件；为避免多个进程竞争视频写入器，多卡模式默认不合并标注视频。
 
-## 7. 生产检测器配置
+## 8. 生产检测器配置
 
 `configs/model_params.example.json` 当前默认用 Grounding DINO 做开放词表探索推理，适合类别探索和半自动标注。等 YOLOX 训练并导出 TorchScript 后，把 `stages` 改成：
 
@@ -123,4 +147,4 @@ torchrun --standalone --nproc-per-node=4 scripts/infer_video.py \
 ]
 ```
 
-如果仍需要不确定实体探索，保留 YOLO-World 或 Grounding DINO 作为旁路/回退模型，不建议让开放词表模型无条件参与每帧生产告警。
+如果仍需要不确定实体探索，保留 YOLO-World、OWLv2、PET-DINO 或 Grounding DINO 作为旁路/回退模型，不建议让开放词表模型无条件参与每帧生产告警。

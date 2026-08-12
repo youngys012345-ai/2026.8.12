@@ -78,6 +78,61 @@ class GroundingDinoStage:
 
 
 @dataclass
+class Owlv2Stage:
+    config: dict[str, Any]
+
+    def __post_init__(self) -> None:
+        try:
+            import torch
+            from transformers import Owlv2ForObjectDetection, Owlv2Processor
+        except ImportError as exc:
+            raise InferenceError(
+                "OWLv2 inference dependencies are missing; install torch and transformers"
+            ) from exc
+
+        device_name = self.config.get("device", "cuda")
+        if device_name == "cuda" and not torch.cuda.is_available():
+            raise InferenceError("CUDA was requested but torch.cuda.is_available() is false")
+        local_rank = int(os.getenv("LOCAL_RANK", "0"))
+        self.device = torch.device(f"cuda:{local_rank}" if device_name == "cuda" else device_name)
+        model_id = self.config.get("model_id", "google/owlv2-base-patch16-ensemble")
+        self.processor = Owlv2Processor.from_pretrained(model_id)
+        self.model = Owlv2ForObjectDetection.from_pretrained(model_id).to(self.device)
+        self.model.eval()
+        if self.config.get("compile", False):
+            self.model = torch.compile(self.model)
+
+    def predict(self, image: Any, context: dict[str, Any]) -> dict[str, Any]:
+        import torch
+
+        prompts = list(self.config.get("prompts", []))
+        if not prompts:
+            raise InferenceError("owlv2 stage requires at least one prompt")
+        text_labels = [[item.strip() for item in prompts]]
+        inputs = self.processor(text=text_labels, images=image, return_tensors="pt").to(self.device)
+        with torch.inference_mode():
+            outputs = self.model(**inputs)
+        target_sizes = torch.tensor([(image.height, image.width)], device=self.device)
+        result = self.processor.post_process_grounded_object_detection(
+            outputs=outputs,
+            target_sizes=target_sizes,
+            threshold=float(self.config.get("threshold", 0.1)),
+            text_labels=text_labels,
+        )[0]
+        labels = result.get("text_labels", result.get("labels", []))
+        detections = []
+        for box, score, label in zip(result["boxes"], result["scores"], labels):
+            detections.append(
+                {
+                    "box": [round(float(value), 2) for value in box.tolist()],
+                    "score": round(float(score), 5),
+                    "label": str(label),
+                }
+            )
+        return context | {"detections": detections}
+
+
+@dataclass
 class TorchScriptDetectorStage:
     """Stable production adapter for a detector exported with an Nx6 output contract."""
 
@@ -164,6 +219,8 @@ def build_stages(config: dict[str, Any]) -> list[Stage]:
         merged = runtime | dict(stage)
         if stage.get("type") == "grounding_dino":
             stages.append(GroundingDinoStage(merged))
+        elif stage.get("type") == "owlv2":
+            stages.append(Owlv2Stage(merged))
         elif stage.get("type") == "torchscript_detector":
             stages.append(TorchScriptDetectorStage(merged))
         else:

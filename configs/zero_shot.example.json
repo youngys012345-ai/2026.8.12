@@ -1,0 +1,31 @@
+{
+  "profile": "industrial-zero-shot-detection",
+  "description": "Local zero-shot object detection baseline for fixed-view industrial scenes.",
+  "runtime": {
+    "device": "cuda",
+    "dtype": "float16",
+    "compile": false
+  },
+  "stages": [
+    {
+      "type": "owlv2",
+      "name": "owlv2_text_zero_shot",
+      "model_id": "google/owlv2-base-patch16-ensemble",
+      "prompts": [
+        "a worker",
+        "a hand",
+        "a hand tool",
+        "a wire harness",
+        "a raw material box",
+        "an electrical component",
+        "a fixture",
+        "an equipment operation area"
+      ],
+      "threshold": 0.1
+    }
+  ],
+  "output": {
+    "save_annotated": true,
+    "json_format": "json_or_jsonl"
+  }
+}

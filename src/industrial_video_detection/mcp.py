@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 from typing import Any
@@ -67,7 +67,7 @@ class McpClient:
             {
                 "protocolVersion": "2025-06-18",
                 "capabilities": {},
-                "clientInfo": {"name": "awesome-llm-apps", "version": "0.1.0"},
+                "clientInfo": {"name": "industrial-video-detection", "version": "0.1.0"},
             },
         )
         headers = {"Mcp-Session-Id": self._session_id} if self._session_id else None
@@ -84,4 +84,5 @@ class McpClient:
 
     def call_tool(self, name: str, arguments: dict[str, Any]) -> Any:
         return self._send("tools/call", {"name": name, "arguments": arguments})
+
 

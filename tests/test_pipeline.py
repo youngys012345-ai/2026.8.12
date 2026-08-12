@@ -1,9 +1,9 @@
-import unittest
+﻿import unittest
 from pathlib import Path
 
-from awesome_llm_apps.config import PipelineConfig, RemoteConfig
-from awesome_llm_apps.inference import load_inference_config
-from awesome_llm_apps.orchestrator import build_plan, execute
+from industrial_video_detection.config import PipelineConfig, RemoteConfig
+from industrial_video_detection.inference import load_inference_config
+from industrial_video_detection.orchestrator import build_plan, execute
 
 
 def sample_config() -> PipelineConfig:
@@ -32,6 +32,11 @@ class PipelineTests(unittest.TestCase):
         ):
             config = load_inference_config(root / "configs" / name)
             self.assertGreaterEqual(len(config["stages"]), 1)
+
+    def test_owlv2_stage_type_is_declared_for_zero_shot_testing(self) -> None:
+        root = Path(__file__).parents[1]
+        config = load_inference_config(root / "configs" / "zero_shot.example.json")
+        self.assertIn("owlv2", {stage["type"] for stage in config["stages"]})
 
     def test_build_plan_orders_lifecycle_before_processing(self) -> None:
         self.assertEqual(
@@ -68,3 +73,4 @@ class PipelineTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

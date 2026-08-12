@@ -61,10 +61,11 @@
     {
       "id": "yolo-world-open-vocabulary",
       "family": "YOLO-World",
-      "role": "open_vocabulary_probe",
+      "role": "zero_shot_open_vocabulary_probe",
       "enabled": true,
       "source": "https://github.com/AILab-CVC/YOLO-World",
       "revision": "master",
+      "license_note": "GPL-3.0 repository; production use in closed systems requires compliance review or commercial licensing.",
       "train": false,
       "deploy": true,
       "download_args": {
@@ -88,10 +89,11 @@
     {
       "id": "pet-dino-visual-prompt",
       "family": "PET-DINO",
-      "role": "visual_prompt_probe",
+      "role": "zero_shot_visual_prompt_probe",
       "enabled": true,
-      "source": "https://github.com/IDEA-Research/PET-DINO",
+      "source": "https://github.com/fuweifuvtoo/PET_DINO",
       "revision": "main",
+      "license_note": "Apache-2.0 repository; research implementation with MMDetection/MM-Grounding-DINO dependencies.",
       "train": false,
       "deploy": false,
       "download_args": {
@@ -107,7 +109,7 @@
     {
       "id": "grounding-dino-helper",
       "family": "Grounding DINO",
-      "role": "text_prompt_annotation_helper",
+      "role": "zero_shot_text_prompt_annotation_helper",
       "enabled": true,
       "source": "IDEA-Research/grounding-dino-tiny",
       "revision": "main",
@@ -115,6 +117,34 @@
       "deploy": false,
       "download_args": {
         "target_dir": "/opt/models/grounding-dino-tiny"
+      }
+    },
+    {
+      "id": "owlv2-zero-shot-baseline",
+      "family": "OWLv2",
+      "role": "zero_shot_text_and_image_guided_baseline",
+      "enabled": true,
+      "source": "google/owlv2-base-patch16-ensemble",
+      "revision": "main",
+      "license_note": "Use Hugging Face model card/license metadata for final production approval.",
+      "train": false,
+      "deploy": false,
+      "download_args": {
+        "target_dir": "/opt/models/owlv2-base-patch16-ensemble"
+      },
+      "deploy_args": {
+        "runtime": "transformers",
+        "device": "cuda",
+        "candidate_prompts": [
+          "a worker",
+          "a hand",
+          "a hand tool",
+          "a wire harness",
+          "a raw material box",
+          "an electrical component",
+          "a fixture",
+          "an equipment operation area"
+        ]
       }
     },
     {

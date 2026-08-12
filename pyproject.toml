@@ -1,11 +1,11 @@
-[build-system]
+﻿[build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "awesome-llm-apps"
+name = "industrial-video-detection"
 version = "0.1.0"
-description = "Configuration-driven orchestration for remote model training, deployment, and media processing over MCP."
+description = "Industrial fixed-view video object detection orchestration and inference over MCP."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = ["httpx>=0.27,<1"]
@@ -16,16 +16,18 @@ inference = [
   "numpy>=1.26,<3",
   "opencv-python-headless>=4.10,<5",
   "pillow>=10,<12",
+  "torch>=2.4,<3",
   "transformers>=4.46,<5",
 ]
 
 [project.scripts]
-llm-pipeline = "awesome_llm_apps.cli:main"
-infer-image = "awesome_llm_apps.inference:main_image"
-infer-video = "awesome_llm_apps.inference:main_video"
+ivd-pipeline = "industrial_video_detection.cli:main"
+llm-pipeline = "industrial_video_detection.cli:main"
+infer-image = "industrial_video_detection.inference:main_image"
+infer-video = "industrial_video_detection.inference:main_video"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/awesome_llm_apps"]
+packages = ["src/industrial_video_detection"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -33,3 +35,4 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+

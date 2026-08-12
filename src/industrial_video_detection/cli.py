@@ -9,7 +9,7 @@ from .orchestrator import build_plan, execute
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="llm-pipeline")
+    parser = argparse.ArgumentParser(prog="ivd-pipeline")
     subparsers = parser.add_subparsers(dest="command", required=True)
     for command in ("validate", "plan", "tools", "run"):
         child = subparsers.add_parser(command)
