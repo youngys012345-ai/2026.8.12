@@ -1,0 +1,54 @@
+[remote]
+url_env = "INTRANET_MCP_URL"
+token_env = "INTRANET_MCP_TOKEN"
+timeout_seconds = 120
+verify_tls = true
+
+# 值为远端 tools/list 返回的真实工具名；接入时替换。
+[tools]
+download = "model_download"
+train = "model_train"
+deploy = "model_deploy"
+compose = "model_compose"
+process_media = "dataset_process_media"
+
+[[models]]
+id = "yolox-production-detector"
+source = "git+https://github.com/Megvii-BaseDetection/YOLOX.git"
+revision = "main"
+train = true
+deploy = true
+
+[models.download_args]
+target_dir = "/opt/models/yolox"
+
+[models.train_args]
+method = "default"
+dataset = "/datasets/train.jsonl"
+distributed = "ddp"
+
+[models.deploy_args]
+engine = "torchscript"
+gpu_strategy = "camera_affinity"
+
+[[models]]
+id = "grounding-dino-annotation-helper"
+source = "hf://IDEA-Research/grounding-dino-tiny"
+revision = "main"
+train = false
+deploy = false
+
+[models.download_args]
+target_dir = "/opt/models/grounding-dino-tiny"
+
+[[compositions]]
+id = "assembly-line-detection"
+strategy = "sequential"
+models = ["yolox-production-detector"]
+
+[[datasets]]
+id = "media-input"
+uri = "/datasets/media"
+media_types = ["image", "video"]
+composition = "assembly-line-detection"
+output_uri = "/datasets/processed"

@@ -1,0 +1,16 @@
+[runtime]
+device = "cuda"
+dtype = "float16"
+
+# 生产配置使用训练后导出的 TorchScript 包，输出契约为 N x 6：
+# [x1, y1, x2, y2, confidence, class_id]，坐标对应 640 x 640 letterbox 输入。
+[[stages]]
+type = "torchscript_detector"
+model_path = "/models/assembly-line-detector/model.ts"
+labels_path = "/models/assembly-line-detector/labels.txt"
+input_size = [640, 640]
+confidence_threshold = 0.30
+
+[output]
+save_jsonl = true
+save_annotated = true

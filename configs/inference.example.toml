@@ -1,0 +1,16 @@
+[runtime]
+device = "cuda"
+dtype = "float16"
+compile = false
+
+# 类别探索/半自动标注配置；不建议作为生产视频逐帧主模型。
+[[stages]]
+type = "grounding_dino"
+model_id = "IDEA-Research/grounding-dino-tiny"
+prompts = ["worker", "electrical cabinet", "tool", "wire", "component", "material box"]
+box_threshold = 0.30
+text_threshold = 0.25
+
+[output]
+save_jsonl = true
+save_annotated = true

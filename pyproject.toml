@@ -1,0 +1,35 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "awesome-llm-apps"
+version = "0.1.0"
+description = "Configuration-driven orchestration for remote model training, deployment, and media processing over MCP."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = ["httpx>=0.27,<1"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<9", "ruff>=0.6,<1"]
+inference = [
+  "numpy>=1.26,<3",
+  "opencv-python-headless>=4.10,<5",
+  "pillow>=10,<12",
+  "transformers>=4.46,<5",
+]
+
+[project.scripts]
+llm-pipeline = "awesome_llm_apps.cli:main"
+infer-image = "awesome_llm_apps.inference:main_image"
+infer-video = "awesome_llm_apps.inference:main_video"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/awesome_llm_apps"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
