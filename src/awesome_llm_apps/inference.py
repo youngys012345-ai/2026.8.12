@@ -145,8 +145,12 @@ class TorchScriptDetectorStage:
 
 
 def load_inference_config(path: str | Path) -> dict[str, Any]:
-    with Path(path).open("rb") as stream:
-        config = tomllib.load(stream)
+    config_path = Path(path)
+    if config_path.suffix.lower() == ".json":
+        config = json.loads(config_path.read_text(encoding="utf-8"))
+    else:
+        with config_path.open("rb") as stream:
+            config = tomllib.load(stream)
     stages = config.get("stages", [])
     if not stages:
         raise InferenceError("configuration requires at least one [[stages]] entry")

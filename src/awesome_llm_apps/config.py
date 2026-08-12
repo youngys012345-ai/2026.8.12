@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import json
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -64,8 +65,12 @@ class PipelineConfig:
 
 
 def load_config(path: str | Path) -> PipelineConfig:
-    with Path(path).open("rb") as stream:
-        raw = tomllib.load(stream)
+    config_path = Path(path)
+    if config_path.suffix.lower() == ".json":
+        raw = json.loads(config_path.read_text(encoding="utf-8"))
+    else:
+        with config_path.open("rb") as stream:
+            raw = tomllib.load(stream)
     remote = raw.get("remote", {})
     config = PipelineConfig(
         remote=RemoteConfig(
@@ -81,4 +86,3 @@ def load_config(path: str | Path) -> PipelineConfig:
     )
     config.validate()
     return config
-

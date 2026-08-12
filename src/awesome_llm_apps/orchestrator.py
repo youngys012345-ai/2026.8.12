@@ -21,6 +21,8 @@ class Step:
 def build_plan(config: PipelineConfig) -> list[Step]:
     steps: list[Step] = []
     for model in config.models:
+        if model.get("enabled", True) is False:
+            continue
         common = {"model_id": model["id"]}
         steps.append(
             Step(
@@ -65,4 +67,3 @@ def build_plan(config: PipelineConfig) -> list[Step]:
 
 def execute(config: PipelineConfig, client: ToolCaller) -> list[Any]:
     return [client.call_tool(step.tool, step.arguments) for step in build_plan(config)]
-

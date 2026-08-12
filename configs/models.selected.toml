@@ -1,4 +1,5 @@
 # 收敛后的模型清单。此文件表达选择，不包含密钥或远端 MCP 工具参数。
+# 统一参数入口见 configs/model_params.example.json。
 
 [[models]]
 id = "yolox"
@@ -6,7 +7,32 @@ role = "production_detector"
 enabled = true
 repository = "https://github.com/Megvii-BaseDetection/YOLOX"
 license = "code: Apache-2.0; verify pretrained-weight terms separately"
-reason = "PyTorch 固定类别检测、多卡训练、TensorRT 与 ByteTrack 路径成熟"
+reason = "PyTorch 固定类别检测、多卡训练、TensorRT/TorchScript 与 ByteTrack 路径成熟"
+
+[[models]]
+id = "yolo-world"
+role = "open_vocabulary_probe"
+enabled = true
+repository = "https://github.com/AILab-CVC/YOLO-World"
+license = "verify repository and checkpoint terms before production use"
+reason = "适合不确定实体名称时做候选对象发现、辅助标注和低频旁路复核"
+
+[[models]]
+id = "pet-dino"
+role = "visual_prompt_probe"
+enabled = true
+repository = "https://github.com/IDEA-Research/PET-DINO"
+license = "verify repository and checkpoint terms before production use"
+reason = "适合用少量视觉样例发现同类工装、夹具、线束、原料和半成品"
+
+[[models]]
+id = "grounding-dino"
+role = "text_prompt_annotation_helper"
+enabled = true
+repository = "https://github.com/IDEA-Research/GroundingDINO"
+weights = "IDEA-Research/grounding-dino-tiny"
+license = "Apache-2.0"
+reason = "用于文本提示类别探索和半自动标注，不作为生产逐帧唯一主链"
 
 [[models]]
 id = "bytetrack"
@@ -17,21 +43,12 @@ license = "MIT"
 reason = "需要轨迹、计数或短时漏检平滑时在检测器后串联"
 
 [[models]]
-id = "grounding-dino"
-role = "annotation_helper"
-enabled = true
-repository = "https://github.com/IDEA-Research/GroundingDINO"
-weights = "IDEA-Research/grounding-dino-tiny"
-license = "Apache-2.0"
-reason = "只用于类别探索和半自动标注，不进入生产逐帧主链"
-
-[[models]]
 id = "omdet-turbo"
-role = "open_vocabulary_experiment"
+role = "open_vocabulary_backup"
 enabled = false
 repository = "https://github.com/om-ai-lab/OmDet"
 license = "Apache-2.0"
-reason = "只有类别频繁动态变化时再与固定类别检测器做现场对照测试"
+reason = "当 YOLO-World 在现场效果或速度不满足时再纳入实测"
 
 [[models]]
 id = "sam2"
@@ -39,4 +56,4 @@ role = "optional_segmentation"
 enabled = false
 repository = "https://github.com/facebookresearch/sam2"
 license = "Apache-2.0"
-reason = "当前只要求边界框；需要像素级轮廓时再启用"
+reason = "当前只要求边界框；需要像素级轮廓或辅助标注时再启用"

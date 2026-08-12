@@ -1,0 +1,182 @@
+{
+  "profile": "industrial-assembly-line-detection",
+  "description": "Unified model, deployment, and inference parameters for fixed third-person industrial e-assembly scenes.",
+  "remote": {
+    "url_env": "INTRANET_MCP_URL",
+    "token_env": "INTRANET_MCP_TOKEN",
+    "timeout_seconds": 120,
+    "verify_tls": true
+  },
+  "tools": {
+    "download": "model_download",
+    "train": "model_train",
+    "deploy": "model_deploy",
+    "compose": "model_compose",
+    "process_media": "process_media"
+  },
+  "models": [
+    {
+      "id": "yolox-production-detector",
+      "family": "YOLOX",
+      "role": "production_detector",
+      "enabled": true,
+      "source": "https://github.com/Megvii-BaseDetection/YOLOX",
+      "revision": "main",
+      "train": true,
+      "deploy": true,
+      "download_args": {
+        "target_dir": "/opt/models/yolox"
+      },
+      "train_args": {
+        "dataset_uri": "/data/industrial-electrical-assembly",
+        "gpus": 4,
+        "precision": "amp",
+        "input_size": [960, 960],
+        "batch_size_per_gpu": 8,
+        "epochs": 300,
+        "num_workers": 8,
+        "classes": [
+          "worker",
+          "hand",
+          "tool",
+          "part",
+          "wire_harness",
+          "material_box",
+          "equipment_operation_area"
+        ],
+        "small_object_strategy": {
+          "enable_tiling": true,
+          "tile_size": 1280,
+          "tile_overlap": 0.2
+        }
+      },
+      "deploy_args": {
+        "runtime": "torchscript",
+        "device": "cuda",
+        "gpu_policy": "camera_or_video_sharding",
+        "export_path": "/models/assembly-line-detector/model.ts",
+        "labels_path": "/models/assembly-line-detector/labels.txt"
+      }
+    },
+    {
+      "id": "yolo-world-open-vocabulary",
+      "family": "YOLO-World",
+      "role": "open_vocabulary_probe",
+      "enabled": true,
+      "source": "https://github.com/AILab-CVC/YOLO-World",
+      "revision": "master",
+      "train": false,
+      "deploy": true,
+      "download_args": {
+        "target_dir": "/opt/models/yolo-world"
+      },
+      "deploy_args": {
+        "runtime": "pytorch",
+        "device": "cuda",
+        "candidate_prompts": [
+          "worker",
+          "hand",
+          "tool",
+          "wire harness",
+          "raw material",
+          "component",
+          "fixture",
+          "operation area"
+        ]
+      }
+    },
+    {
+      "id": "pet-dino-visual-prompt",
+      "family": "PET-DINO",
+      "role": "visual_prompt_probe",
+      "enabled": true,
+      "source": "https://github.com/IDEA-Research/PET-DINO",
+      "revision": "main",
+      "train": false,
+      "deploy": false,
+      "download_args": {
+        "target_dir": "/opt/models/pet-dino"
+      },
+      "deploy_args": {
+        "runtime": "research_pytorch",
+        "device": "cuda",
+        "support_images_dir": "/data/industrial-electrical-assembly/prompts",
+        "max_support_images_per_class": 8
+      }
+    },
+    {
+      "id": "grounding-dino-helper",
+      "family": "Grounding DINO",
+      "role": "text_prompt_annotation_helper",
+      "enabled": true,
+      "source": "IDEA-Research/grounding-dino-tiny",
+      "revision": "main",
+      "train": false,
+      "deploy": false,
+      "download_args": {
+        "target_dir": "/opt/models/grounding-dino-tiny"
+      }
+    },
+    {
+      "id": "bytetrack",
+      "family": "ByteTrack",
+      "role": "optional_tracker",
+      "enabled": false,
+      "source": "https://github.com/FoundationVision/ByteTrack",
+      "revision": "main",
+      "train": false,
+      "deploy": false
+    }
+  ],
+  "compositions": [
+    {
+      "id": "production-serial-detector",
+      "strategy": "sequential",
+      "models": [
+        "yolox-production-detector",
+        "yolo-world-open-vocabulary"
+      ],
+      "handoff": {
+        "mode": "production_detector_first",
+        "open_vocabulary_usage": "fallback_or_unknown_object_probe"
+      }
+    }
+  ],
+  "datasets": [
+    {
+      "id": "local-data-folder",
+      "uri": "data/raw",
+      "kind": "image_or_video_folder",
+      "composition": "production-serial-detector",
+      "output_dir": "artifacts/inference"
+    }
+  ],
+  "runtime": {
+    "device": "cuda",
+    "dtype": "float16",
+    "compile": false
+  },
+  "stages": [
+    {
+      "type": "grounding_dino",
+      "name": "open_text_probe",
+      "model_id": "IDEA-Research/grounding-dino-tiny",
+      "prompts": [
+        "worker",
+        "hand",
+        "tool",
+        "wire harness",
+        "raw material",
+        "component",
+        "fixture",
+        "operation area"
+      ],
+      "box_threshold": 0.3,
+      "text_threshold": 0.25
+    }
+  ],
+  "output": {
+    "save_annotated": true,
+    "json_format": "json_or_jsonl"
+  }
+}

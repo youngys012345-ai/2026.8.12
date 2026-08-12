@@ -1,69 +1,107 @@
 # 工业电装流水线模型收敛评估
 
-评估范围：第三人称固定视角；工人操作设备、工具、工件、线束和原料；目标是边界框检测，测试数据由使用方提供；运行环境为多张 RTX 4090、PyTorch + CUDA。本文把“代码公开、权重公开、许可可接受、环境可维护”分别判断，开源许可结论仍应由项目法务最终确认。
+评估范围：第三人称固定视角；工业电装生产流水线；工人操作设备、工具、工件、线束、原料、料盒和工位区域；核心任务是目标检测，必要时引入视觉提示或开放词表模型做类别探索、辅助标注和未知实体发现。运行环境按多张 RTX 4090、PyTorch + CUDA 设计。开源许可结论仍建议在生产落地前由项目法务或负责人最终确认。
+
+## 为什么 PET-DINO 不应直接剔除
+
+之前把 PET-DINO 剔除，是基于“固定类别生产检测主链”的保守判断：如果类别已经固定、标注充分、指标要稳定，YOLOX 这类固定类别检测器更适合作为生产主模型。但你补充的前提改变了判断：
+
+- 你的场景中有些实体名称未必一开始就能确定，例如某些工装、夹具、线束、半成品、原料盒和局部设备区域。
+- 第三人称固定视角让视觉提示更可行：可以从同一机位截取稳定样例，用“给样例找同类”的方式减少文本类名不准带来的漂移。
+- 视觉提示模型适合做数据建设阶段的少样本召回、相似物发现和辅助标注，可以帮你更快形成最终固定类别训练集。
+
+所以 PET-DINO 不应进入生产主链的首选，但应保留为探索链路：用少量视觉样例发现同类目标，再人工复核并沉淀成 YOLOX 训练数据。
 
 ## 推荐架构
 
 ```text
-Grounding DINO（离线类别探索/辅助标注）
-                  ↓ 人工复核形成固定类别数据集
-YOLOX 或已取得企业授权的 YOLOE（生产检测） → ByteTrack（可选时序关联） → 规则/事件层
+开放探索层：Grounding DINO / YOLO-World / PET-DINO
+        ↓ 人工复核与类别收敛
+生产检测层：YOLOX 固定类别检测器
+        ↓ 可选
+时序关联层：ByteTrack
+        ↓
+规则与事件层：操作顺序、区域进入、物料拿取、工具使用、漏装/误放等
 ```
 
-固定机位使背景、拍摄距离和目标集合相对稳定。生产阶段使用经过现场数据训练的固定类别检测器，通常比每帧运行开放词汇模型更快、更稳定，也更容易定义漏检率、误报率和延迟验收线。这里的“串联”应是检测 → 跟踪 → 事件规则，而不是把多个检测器逐帧重复串联。
+这里的“串联”建议理解为任务链串联，而不是把多个检测器无条件逐帧堆叠。生产告警链路应尽量稳定；开放词表和视觉提示模型更适合在离线探索、旁路复核、未知实体召回或低频抽帧检查中使用。
 
-## 保留
+## 保留模型
 
-### 1. YOLOX + ByteTrack：生产主线首选
+### 1. YOLOX + ByteTrack：生产主线
 
-- YOLOX 是 PyTorch 检测器；ByteTrack 官方实现与 YOLOX 生态直接配套，适合固定类别视频目标检测和轨迹连续化。
-- YOLOX **代码仓库**明确采用 Apache-2.0；官方预训练权重是否自动适用同一许可目前缺少足够明确的单独声明。生产项目应优先用自有现场数据训练最终权重，并保存所有初始化权重的来源、版本和许可快照。
-- 对多卡 4090，可用 DDP 训练；推理端通常按摄像头/视频分卡，避免逐帧跨卡通信。需要单路极致性能时再导出 TensorRT。
-- 首期类别建议围绕可观察对象定义，例如 `worker`、设备操作区、工具、物料箱、线束/工件；“正在操作”属于人与设备/物料的时空关系，应放到后续事件层，不能只靠目标框标签可靠表达。
-- 风险：必须使用现场数据重训；小零件和遮挡需要高分辨率、切片或专门的小目标策略。
+- YOLOX 是 PyTorch 检测器，适合在固定机位、固定或半固定类别上用现场数据训练。
+- ByteTrack 适合在检测器后串联，用于轨迹、计数、短时漏检平滑和操作过程关联。
+- 对多卡 4090，训练可用 DDP；推理更建议按摄像头或视频分配 GPU，而不是把单路实时流拆成跨卡逐帧通信。
+- 首期类别建议从可观察对象定义：`worker`、`hand`、`tool`、`part`、`wire_harness`、`material_box`、`equipment_operation_area`。像“正在操作”“漏装”“误放”更适合放到事件层，不要只靠单个框标签表达。
 
-### 2. Grounding DINO：只用于辅助标注和类别探索
+### 2. YOLO-World：开放词表实体探索与未知对象旁路
 
-- 官方代码和可下载权重均存在，Apache-2.0；Hugging Face Transformers 也有实现，迁移成本较低。
-- 适合在数据准备阶段用文本提示召回未知或新增物料，再由人工复核。
-- 不建议作为每帧生产主模型：固定类别场景没有必要持续支付文本编码/融合开销，且开放词汇输出的阈值和同义词漂移不利于稳定告警。
+- YOLO-World 对你的场景是有价值的，尤其当你还不能准确命名实体，或者同一对象在不同工位有不同叫法时。
+- 推荐用途：离线抽帧检测、候选类名探索、未知目标发现、标注前预检、生产链路的低频旁路复核。
+- 工程风险：官方依赖 MMYOLO/MMDetection，部署面比 YOLOX 更大；阈值和 prompt 设计需要现场验证。
+- 不建议作为第一版生产逐帧唯一主模型：开放词表输出会受 prompt、同义词和阈值影响，告警验收线更难稳定。
 
-### 3. OmDet-Turbo：实时开放词汇备选，不作为首选训练主线
+### 3. PET-DINO：视觉提示/少样本同类召回
 
-- 官方 PyTorch 仓库、Tiny 权重、ONNX 导出和 Apache-2.0 许可均可获取。
-- 当类别经常变化且必须在线文本提示时值得实测；附件中的 100.2 FPS 是 A100/TensorRT/特定条件结果，不能外推为 4090 端到端视频 FPS。
-- 官方工程更偏预训练权重推理和导出；对于现场固定类别训练，YOLOX 的工程路径更直接。
+- PET-DINO 的价值在于视觉提示，而不是文本提示。它适合用少量样例图提示模型寻找同类物体。
+- 推荐用途：工装、夹具、原料、半成品、线束局部等难命名或形态相近目标的探索；辅助标注；新物料上线时的快速召回。
+- 工程风险：研究实现较新，训练/部署链路成熟度需要实测；不建议首期承担生产实时主链 SLA。
+- 落地方式：把视觉样例放到 `data/raw/` 或远端数据目录下的 prompt/support 子目录，作为离线探索任务输入；输出候选框后人工复核，再进入固定类别训练集。
 
-### 4. SAM 2 / Grounded SAM 2：按需保留
+### 4. Grounding DINO：文本提示辅助标注
 
-- 代码、训练代码和检查点可获取，SAM 2 主体为 Apache-2.0。
-- 只有在需要像素级区域、精细遮挡轮廓或辅助标注时才加入；纯边界框检测首期不需要。
+- 代码和可下载权重成熟，适合用文本 prompt 先扫一批候选目标。
+- 推荐用途：类别探索、半自动标注、和 YOLO-World/PET-DINO 的结果互相对照。
+- 不建议作为每帧生产主模型：固定类别生产检测没有必要长期支付文本融合开销，开放词汇输出也更难直接绑定稳定告警阈值。
 
-## 从首期剔除
+### 5. OmDet-Turbo：实时开放词表备选
 
-- **LocateAnything-3B/GGUF**：模型明确限非商业研究；3B 模型也不适合该固定类别逐帧链路。
-- **Grounding DINO 1.5、DINO-X、T-Rex2**：公开项目主要是 API 调用链，不等于完整本地权重和私有化训练部署链；与内网数据边界冲突。
-- **PET-DINO**：视觉示例提示解决“给样例找同类”，不是固定类别生产检测的优先问题；属于很新的研究实现，先不承担主线风险。
-- **HeadCLIP、AnomalyCLIP、AdaCLIP、VCP-CLIP、FE-CLIP、DLVP-CLIP、FB-CLIP、MoECLIP、AnomalyVFM**：核心任务是异常/缺陷分数或掩码，而当前需求是人员、设备、原料等对象检测。未来若明确增加表面缺陷检测，应作为独立支线评估；其中 AnomalyCLIP 的代码和权重可获取，但不改变任务不匹配的问题。
-- **Florence-2**：OCR、描述、多任务能力会增加推理成本，当前边界框任务用不到。
-- **GLIP/GLIPv2、Detic、RegionCLIP、ViLD、F-VLM、CoDet、CLIPSelf、X-Decoder/OpenSeeD、OWLv2**：能获取其中不少代码/权重，但属于较老、研究型或重依赖栈的开放词汇路线；在已有 Grounding DINO 辅助标注 + 固定类生产检测器的情况下没有首期增益。
-- **PP-YOLOE+/PP-PicoDet**：本身成熟且 Apache-2.0，但核心环境指定 PyTorch；引入 PaddlePaddle 会形成第二套 CUDA/训练/部署依赖。仅在后续端侧设备明确采用 Paddle Inference 时重评。
-- **YOLO-World**：开放词汇能力对固定类别生产推理不是必需；官方工程依赖 MMYOLO/MMDetection，维护面更大。
-- **Ultralytics YOLOE/YOLOE-26**：工程可部署，但 Ultralytics 当前采用 AGPL-3.0/企业双许可。工业闭源系统应先确认义务或取得企业许可，不能按附件所述无条件商用。
-- **PP-PicoDet/YOLOE Tiny 的无 GPU 方案**：目标环境是多卡 4090，与实际部署条件不符。
+- 有 PyTorch、ONNX 和 Apache-2.0 路线，可作为开放词表方向的备选。
+- 只有当 YOLO-World 在你的 4090 环境中速度或效果不满足时，再纳入同场景实测。
+
+### 6. SAM 2 / Grounded SAM 2：像素级支线
+
+- 当前任务是目标检测，不需要首期引入像素级分割。
+- 如果后续需要精细遮挡轮廓、抓取区域、装配区域边界或辅助标注，再启用。
+
+## 暂不纳入首期
+
+- **LocateAnything-3B/GGUF**：模型条款偏研究用途，且 3B 级别不适合作为固定类别逐帧检测链路。
+- **Grounding DINO 1.5、DINO-X、T-Rex2**：公开使用形态更偏 API 或平台能力，不等于完整本地权重、私有化训练和内网部署链。
+- **HeadCLIP、AnomalyCLIP、AdaCLIP、VCP-CLIP、FE-CLIP、DLVP-CLIP、FB-CLIP、MoECLIP、AnomalyVFM**：核心更偏异常/缺陷分数或分割，不是当前“人员、设备、工具、原料目标检测”的主任务。
+- **Florence-2**：多任务能力强，但 OCR、描述、通用视觉问答会增加推理成本；当前边界框检测首期用不到。
+- **GLIP/GLIPv2、Detic、RegionCLIP、ViLD、F-VLM、CoDet、CLIPSelf、X-Decoder/OpenSeeD、OWLv2**：多数属于较老、研究型或重依赖开放词汇路线；在 YOLO-World、Grounding DINO、PET-DINO 已覆盖探索需求后，首期增益不明显。
+- **PP-YOLOE+/PP-PicoDet**：成熟且许可友好，但你的环境是 PyTorch + CUDA；引入 PaddlePaddle 会增加第二套训练/部署栈。
+- **Ultralytics YOLOE/YOLOE-26**：工程可用，但 AGPL-3.0/企业双许可需要先确认闭源工业系统的合规边界。
 
 ## 实测验收建议
 
-用你提供的数据按摄像头、日期和产线划分训练/验证/测试，避免相邻视频帧跨集合泄漏。除 mAP 外必须分别记录关键类别召回率、每小时误报次数、小目标召回、遮挡召回、端到端 FPS/P95 延迟、显存和连续运行稳定性。第一轮建议比较 `YOLOX-S/M/L` 的速度—精度曲线，再决定是否启用切片、高分辨率或 ByteTrack。
+请把测试数据按摄像头、日期、班次、产线拆分，避免相邻视频帧跨训练/验证/测试集泄漏。除 mAP 外，建议记录：
+
+- 关键类别召回率，尤其是手、工具、小零件、线束和料盒。
+- 每小时误报次数和漏报样例。
+- 小目标召回、遮挡召回、不同光照/班次稳定性。
+- 端到端 FPS、P95 延迟、显存占用和连续运行稳定性。
+- 开放词表/视觉提示模型输出进入人工复核后的有效标注率。
+
+## 当前推荐优先级
+
+1. 用 Grounding DINO、YOLO-World、PET-DINO 对 `data/raw/` 中的抽帧做探索，收敛类别与标注规则。
+2. 人工复核后形成固定类别数据集。
+3. 训练 YOLOX-S/M/L，对比速度和精度。
+4. 按需要串联 ByteTrack 与事件规则。
+5. 保留 YOLO-World/PET-DINO 作为未知对象发现和新物料上线时的旁路工具。
 
 ## 主要官方来源
 
+- YOLOX / ByteTrack: https://github.com/Megvii-BaseDetection/YOLOX and https://github.com/FoundationVision/ByteTrack
+- YOLO-World: https://github.com/AILab-CVC/YOLO-World
+- PET-DINO: https://github.com/IDEA-Research/PET-DINO
 - Grounding DINO: https://github.com/IDEA-Research/GroundingDINO
 - SAM 2: https://github.com/facebookresearch/sam2
 - Grounded SAM 2: https://github.com/IDEA-Research/Grounded-SAM-2
 - OmDet-Turbo: https://github.com/om-ai-lab/OmDet
-- YOLOX / ByteTrack: https://github.com/Megvii-BaseDetection/YOLOX and https://github.com/FoundationVision/ByteTrack
 - Ultralytics license: https://github.com/ultralytics/ultralytics
 - LocateAnything model terms: https://huggingface.co/nvidia/LocateAnything-3B
-- AnomalyCLIP: https://github.com/zqhang/AnomalyCLIP
 - PaddleDetection: https://github.com/PaddlePaddle/PaddleDetection
